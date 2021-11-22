@@ -1,6 +1,5 @@
 import {
   Clock,
-  DirectionalLight,
   InstancedBufferAttribute,
   InstancedMesh,
   Matrix4,
@@ -9,7 +8,6 @@ import {
   Quaternion,
   Scene,
   ShaderMaterial,
-  UniformsLib,
   Vector3,
   WebGLRenderer
 } from "three";
@@ -18,7 +16,7 @@ import {terrainFragmentShader} from "./fragmentShader.glsl";
 import {terrainVertexShader} from "./vertexShader.glsl";
 import {FlyControls} from "three/examples/jsm/controls/FlyControls";
 import Stats from "three/examples/jsm/libs/stats.module";
-import { GUI } from 'three/examples/jsm/libs/dat.gui.module'
+import {GUI} from 'three/examples/jsm/libs/dat.gui.module'
 import {AABB} from "./aabb";
 
 const minLOD = 6
@@ -35,16 +33,8 @@ const clock = new Clock()
 
 const scene = new Scene();
 
-// directional light to demonstrate normals
-const directionalLight = new DirectionalLight();
-directionalLight.position.set(1000, 1000, 1000)
-
 const camera = new PerspectiveCamera(75, canvas.offsetWidth / canvas.offsetHeight, 0.1, 100000);
 camera.position.set(0, 40, 40);
-
-// add directional light to camera to ironically keep constant while moving
-camera.add(directionalLight)
-scene.add(camera)
 
 // resize canvas on window resize
 const resize = () => {
@@ -90,11 +80,9 @@ const material = new ShaderMaterial({
   uniforms: {
     minSideLength: {value: Math.pow(2, minLOD)},
     offsets: {type: "v2v", value: offsets()},
-    ...UniformsLib['lights'], // include uniforms for directional light
   },
   vertexShader: terrainVertexShader,
   fragmentShader: terrainFragmentShader,
-  lights: true, // directional light
 })
 
 // instanced mesh to reuse same geometry and material for each terrain tile
