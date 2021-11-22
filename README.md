@@ -4,6 +4,8 @@ This project demonstrates the use of a linear quadtree with level differences to
 
 ![Camera flying out showing tiling](flyout.gif)
 
+[Demo](https://tschie.github.io/terrain-linear-quadtree-level-differences/)
+
 ## Usage
 
 Fly the camera using WASD. Click and drag to point camera. As you fly around, tiles will update their resolutions. 
