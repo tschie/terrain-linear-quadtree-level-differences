@@ -4,7 +4,7 @@ This project demonstrates the use of a linear quadtree with level differences to
 
 ![Camera flying out showing tiling](flyout.gif)
 
-[Demo](https://tschie.github.io/terrain-linear-quadtree-level-differences/)
+[Demo](https://tschie.github.io/terrain-linear-quadtree-level-differences/) (currently not suitable for mobile devices)
 
 ## Usage
 
