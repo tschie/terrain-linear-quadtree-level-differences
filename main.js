@@ -113,6 +113,12 @@ const stats = Stats();
 document.body.appendChild(stats.domElement);
 
 const gui = new GUI();
+
+const updateControl = { update: true };
+const quadtreeFolder = gui.addFolder("Quadtree");
+quadtreeFolder.add(updateControl, "update", true);
+quadtreeFolder.open();
+
 const materialFolder = gui.addFolder("Material");
 materialFolder.add(material, "wireframe", false);
 materialFolder.open();
@@ -123,62 +129,64 @@ const animate = () => {
   // update camera
   controls.update(clock.getDelta());
 
-  // frustum
-  const frustum = new Frustum().setFromProjectionMatrix(
-    new Matrix4().multiply(camera.projectionMatrix, camera.matrixWorldInverse)
-  );
+  if (updateControl.update) {
+    // frustum
+    const frustum = new Frustum().setFromProjectionMatrix(
+      new Matrix4().multiply(camera.projectionMatrix, camera.matrixWorldInverse)
+    );
 
-  // generate new quadtree from updated camera position
-  const quadtree = new Quadtree(terrainBounds, maxDepth, (aabb) => {
-    // split tree if it's larger than the minimum tile size and it's close to the camera
-    return (
-      frustum.intersectsBox(aabb) &&
-      aabb.max.x - aabb.min.x > Math.pow(2, minLOD) &&
-      aabb.getCenter(new Vector3()).distanceTo(camera.position) <
-        aabb.getSize(new Vector3()).length()
-    );
-  });
+    // generate new quadtree from updated camera position
+    const quadtree = new Quadtree(terrainBounds, maxDepth, (aabb) => {
+      // split tree if it's visible by the camera, larger than the minimum tile size, and it's close to the camera
+      return (
+        frustum.intersectsBox(aabb) &&
+        aabb.max.x - aabb.min.x > Math.pow(2, minLOD) &&
+        aabb.getCenter(new Vector3()).distanceTo(camera.position) <
+          aabb.getSize(new Vector3()).length()
+      );
+    });
 
-  // create an "instance" of the instanced mesh for each quadtree node (a terrain tile)
-  [...quadtree.tree.values()].forEach((node, i) => {
-    const sideLength = node.aabb.max.x - node.aabb.min.x;
-    // use the constant time neighbor lookup to get the neighbor side lengths
-    const neighborSideLengths = node.getNeighbors().map(
-      (neighbor) =>
-        neighbor ? neighbor.aabb.max.x - neighbor.aabb.min.x : sideLength // assume same scale for missing neighbors
-    );
-    // update transform and attributes for each tile
-    instancedMesh.setMatrixAt(
-      i,
-      new Matrix4().compose(
-        node.aabb.getCenter(new Vector3()),
-        new Quaternion(),
-        new Vector3(sideLength, 1, sideLength)
-      )
-    );
-    sideLengthAttribute.set(Float32Array.from([sideLength]), i);
-    neighborSideLengthsAttribute.set(
-      Float32Array.from(neighborSideLengths),
-      i * 4
-    );
-  });
+    // create an "instance" of the instanced mesh for each quadtree node (a terrain tile)
+    [...quadtree.tree.values()].forEach((node, i) => {
+      const sideLength = node.aabb.max.x - node.aabb.min.x;
+      // use the constant time neighbor lookup to get the neighbor side lengths
+      const neighborSideLengths = node.getNeighbors().map(
+        (neighbor) =>
+          neighbor ? neighbor.aabb.max.x - neighbor.aabb.min.x : sideLength // assume same scale for missing neighbors
+      );
+      // update transform and attributes for each tile
+      instancedMesh.setMatrixAt(
+        i,
+        new Matrix4().compose(
+          node.aabb.getCenter(new Vector3()),
+          new Quaternion(),
+          new Vector3(sideLength, 1, sideLength)
+        )
+      );
+      sideLengthAttribute.set(Float32Array.from([sideLength]), i);
+      neighborSideLengthsAttribute.set(
+        Float32Array.from(neighborSideLengths),
+        i * 4
+      );
+    });
 
-  for (let i = quadtree.tree.size; i < 1000; i++) {
-    // hide unused instances below terrain and set scale to 0
-    instancedMesh.setMatrixAt(
-      i,
-      new Matrix4().compose(
-        new Vector3(0, -1000, 0),
-        new Quaternion(),
-        new Vector3(0, 0, 0)
-      )
-    );
+    for (let i = quadtree.tree.size; i < 1000; i++) {
+      // hide unused instances below terrain and set scale to 0
+      instancedMesh.setMatrixAt(
+        i,
+        new Matrix4().compose(
+          new Vector3(0, -1000, 0),
+          new Quaternion(),
+          new Vector3(0, 0, 0)
+        )
+      );
+    }
+
+    // mark to update
+    neighborSideLengthsAttribute.needsUpdate = true; // comment out to see seams
+    sideLengthAttribute.needsUpdate = true;
+    instancedMesh.instanceMatrix.needsUpdate = true;
   }
-
-  // mark to update
-  neighborSideLengthsAttribute.needsUpdate = true; // comment out to see seams
-  sideLengthAttribute.needsUpdate = true;
-  instancedMesh.instanceMatrix.needsUpdate = true;
 
   renderer.render(scene, camera);
 
