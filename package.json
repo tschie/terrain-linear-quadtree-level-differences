@@ -10,6 +10,7 @@
     "vite": "^2.6.4"
   },
   "dependencies": {
+    "prettier": "^2.5.0",
     "three": "^0.134.0"
   }
 }

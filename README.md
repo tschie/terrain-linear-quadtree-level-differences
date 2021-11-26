@@ -12,6 +12,8 @@ Fly the camera using WASD. Click and drag to point camera. As you fly around, ti
 
 Check the wireframe box to visualize the tiling. Uncheck to see that there are no seams between tiles.
 
+Toggle quadtree updating with the update checkbox.
+
 ## Run Locally
 
 1. Clone the repository.
