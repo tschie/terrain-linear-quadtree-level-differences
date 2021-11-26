@@ -177,9 +177,9 @@ export const terrainVertexShader = `
     }
 
     // calculate using finite differences of neighbors
-    vec3 calcNormal(vec2 pos) {
+    vec3 calcNormal(vec3 pos) {
         float x = pos.x;
-        float z = pos.y;
+        float z = pos.z;
         float heightLeft = height(x - 1.0, z);
         float heightRight = height(x + 1.0, z);
         float heightDown = height(x, z - 1.0);
@@ -190,12 +190,10 @@ export const terrainVertexShader = `
     void main() {
         // world position for the vertex in this instance
         vec3 worldPosition = (instanceMatrix * vec4(position, 1.0)).xyz;
-        // calculate noise at world x,z coordinate
-        vec2 noiseSamplePosition = vec2(worldPosition.x, worldPosition.z);
         // adjust y value with noise height
         vec3 finalPosition = vec3(worldPosition.x, heightBlended(position, worldPosition), worldPosition.z);
         // pass calculated normal to fragment shader
-        vNormal = calcNormal(noiseSamplePosition);
+        vNormal = calcNormal(worldPosition);
         gl_Position = projectionMatrix * viewMatrix * vec4(finalPosition, 1.0);
     }
-`
+`;
