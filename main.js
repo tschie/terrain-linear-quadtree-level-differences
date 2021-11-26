@@ -1,5 +1,7 @@
 import {
+  Box3,
   Clock,
+  Frustum,
   InstancedBufferAttribute,
   InstancedMesh,
   Matrix4,
@@ -9,50 +11,57 @@ import {
   Scene,
   ShaderMaterial,
   Vector3,
-  WebGLRenderer
+  WebGLRenderer,
 } from "three";
-import {Quadtree} from "./quadtree";
-import {terrainFragmentShader} from "./fragmentShader.glsl";
-import {terrainVertexShader} from "./vertexShader.glsl";
-import {FlyControls} from "three/examples/jsm/controls/FlyControls";
+import { Quadtree } from "./quadtree";
+import { terrainFragmentShader } from "./fragmentShader.glsl";
+import { terrainVertexShader } from "./vertexShader.glsl";
+import { FlyControls } from "three/examples/jsm/controls/FlyControls";
 import Stats from "three/examples/jsm/libs/stats.module";
-import {GUI} from 'three/examples/jsm/libs/dat.gui.module'
-import {AABB} from "./aabb";
+import { GUI } from "three/examples/jsm/libs/dat.gui.module";
 
-const minLOD = 6
-const maxLOD = 14
-const boundsScale = Math.pow(2, maxLOD)
-const terrainBounds = new AABB(new Vector3(-1 * boundsScale, 0, -1 * boundsScale), new Vector3(boundsScale, 0, boundsScale))
-const maxDepth = maxLOD - minLOD + 1
+const minLOD = 6;
+const maxLOD = 14;
+const boundsScale = Math.pow(2, maxLOD);
+const terrainBounds = new Box3(
+  new Vector3(-1 * boundsScale, 0, -1 * boundsScale),
+  new Vector3(boundsScale, 0, boundsScale)
+);
+const maxDepth = maxLOD - minLOD + 1;
 
-const canvas = document.querySelector("canvas")
+const canvas = document.querySelector("canvas");
 
-const renderer = new WebGLRenderer({canvas});
+const renderer = new WebGLRenderer({ canvas });
 
-const clock = new Clock()
+const clock = new Clock();
 
 const scene = new Scene();
 
-const camera = new PerspectiveCamera(75, canvas.offsetWidth / canvas.offsetHeight, 0.1, 100000);
+const camera = new PerspectiveCamera(
+  75,
+  canvas.offsetWidth / canvas.offsetHeight,
+  0.1,
+  100000
+);
 camera.position.set(0, 40, 40);
 
 // resize canvas on window resize
 const resize = () => {
-  canvas.width = canvas.offsetWidth
-  canvas.height = canvas.offsetHeight
-  camera.aspect = canvas.offsetWidth / canvas.offsetHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-}
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  camera.aspect = canvas.offsetWidth / canvas.offsetHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+};
 
-window.addEventListener("resize", resize)
-resize()
+window.addEventListener("resize", resize);
+resize();
 
 // camera fly controls
 const controls = new FlyControls(camera, renderer.domElement);
-controls.dragToLook = true
-controls.movementSpeed = 150
-controls.rollSpeed = 1
+controls.dragToLook = true;
+controls.movementSpeed = 150;
+controls.rollSpeed = 1;
 
 // create some offsets to vary the noise (could use a seed instead of random)
 const offsets = () => {
@@ -61,42 +70,52 @@ const offsets = () => {
     const offsetX = -100000.0 + Math.random() * 100000.0;
     const offsetY = -100000.0 + Math.random() * 100000.0;
     return [offsetX, offsetY];
-  })
-}
+  });
+};
 
 // single plane geometry shared by each terrain tile
-const geometry = new PlaneBufferGeometry(1, 1, 64, 64) // 1x1 with 64x64 cells
+const geometry = new PlaneBufferGeometry(1, 1, 64, 64); // 1x1 with 64x64 cells
 geometry.rotateX(-Math.PI / 2); // flip to xz plane
 
 // store side length of each terrain tile
-const sideLengthAttribute = new InstancedBufferAttribute(new Float32Array(1000), 1, false, 1);
+const sideLengthAttribute = new InstancedBufferAttribute(
+  new Float32Array(1000),
+  1,
+  false,
+  1
+);
 // store 4 neighbor's side lengths for each terrain tile
-const neighborSideLengthsAttribute = new InstancedBufferAttribute(new Float32Array(1000 * 4), 4, false, 1)
+const neighborSideLengthsAttribute = new InstancedBufferAttribute(
+  new Float32Array(1000 * 4),
+  4,
+  false,
+  1
+);
 
-geometry.setAttribute("sideLength", sideLengthAttribute)
-geometry.setAttribute("neighborSideLengths", neighborSideLengthsAttribute)
+geometry.setAttribute("sideLength", sideLengthAttribute);
+geometry.setAttribute("neighborSideLengths", neighborSideLengthsAttribute);
 
 const material = new ShaderMaterial({
   uniforms: {
-    minSideLength: {value: Math.pow(2, minLOD)},
-    offsets: {type: "v2v", value: offsets()},
+    minSideLength: { value: Math.pow(2, minLOD) },
+    offsets: { type: "v2v", value: offsets() },
   },
   vertexShader: terrainVertexShader,
   fragmentShader: terrainFragmentShader,
-})
+});
 
 // instanced mesh to reuse same geometry and material for each terrain tile
 // pick a count > max number of tiles expected
 const instancedMesh = new InstancedMesh(geometry, material, 1000);
-scene.add(instancedMesh)
+scene.add(instancedMesh);
 
-const stats = Stats()
-document.body.appendChild(stats.domElement)
+const stats = Stats();
+document.body.appendChild(stats.domElement);
 
 const gui = new GUI();
-const materialFolder = gui.addFolder('Material')
-materialFolder.add(material, 'wireframe', false)
-materialFolder.open()
+const materialFolder = gui.addFolder("Material");
+materialFolder.add(material, "wireframe", false);
+materialFolder.open();
 
 const animate = () => {
   requestAnimationFrame(animate);
@@ -104,38 +123,66 @@ const animate = () => {
   // update camera
   controls.update(clock.getDelta());
 
+  // frustum
+  const frustum = new Frustum().setFromProjectionMatrix(
+    new Matrix4().multiply(camera.projectionMatrix, camera.matrixWorldInverse)
+  );
+
   // generate new quadtree from updated camera position
-  const quadtree = new Quadtree(terrainBounds, maxDepth, aabb => {
+  const quadtree = new Quadtree(terrainBounds, maxDepth, (aabb) => {
     // split tree if it's larger than the minimum tile size and it's close to the camera
-    return aabb.max.x - aabb.min.x > Math.pow(2, minLOD) && aabb.center.distanceTo(camera.position) < aabb.size
+    return (
+      frustum.intersectsBox(aabb) &&
+      aabb.max.x - aabb.min.x > Math.pow(2, minLOD) &&
+      aabb.getCenter(new Vector3()).distanceTo(camera.position) <
+        aabb.getSize(new Vector3()).length()
+    );
   });
 
   // create an "instance" of the instanced mesh for each quadtree node (a terrain tile)
   [...quadtree.tree.values()].forEach((node, i) => {
-    const sideLength = node.aabb.max.x - node.aabb.min.x
+    const sideLength = node.aabb.max.x - node.aabb.min.x;
     // use the constant time neighbor lookup to get the neighbor side lengths
-    const neighborSideLengths = node.getNeighbors().map(neighbor =>
-      neighbor ? neighbor.aabb.max.x - neighbor.aabb.min.x : sideLength // assume same scale for missing neighbors
-    )
+    const neighborSideLengths = node.getNeighbors().map(
+      (neighbor) =>
+        neighbor ? neighbor.aabb.max.x - neighbor.aabb.min.x : sideLength // assume same scale for missing neighbors
+    );
     // update transform and attributes for each tile
-    instancedMesh.setMatrixAt(i, new Matrix4().compose(node.aabb.center, new Quaternion(), new Vector3(sideLength, 1, sideLength)))
+    instancedMesh.setMatrixAt(
+      i,
+      new Matrix4().compose(
+        node.aabb.getCenter(new Vector3()),
+        new Quaternion(),
+        new Vector3(sideLength, 1, sideLength)
+      )
+    );
     sideLengthAttribute.set(Float32Array.from([sideLength]), i);
-    neighborSideLengthsAttribute.set(Float32Array.from(neighborSideLengths), i * 4)
-  })
+    neighborSideLengthsAttribute.set(
+      Float32Array.from(neighborSideLengths),
+      i * 4
+    );
+  });
 
-  for(let i = quadtree.tree.size; i < 1000; i++) {
+  for (let i = quadtree.tree.size; i < 1000; i++) {
     // hide unused instances below terrain and set scale to 0
-    instancedMesh.setMatrixAt(i, new Matrix4().compose(new Vector3(0, -1000, 0), new Quaternion(), new Vector3(0, 0, 0)))
+    instancedMesh.setMatrixAt(
+      i,
+      new Matrix4().compose(
+        new Vector3(0, -1000, 0),
+        new Quaternion(),
+        new Vector3(0, 0, 0)
+      )
+    );
   }
 
   // mark to update
-  neighborSideLengthsAttribute.needsUpdate = true // comment out to see seams
+  neighborSideLengthsAttribute.needsUpdate = true; // comment out to see seams
   sideLengthAttribute.needsUpdate = true;
   instancedMesh.instanceMatrix.needsUpdate = true;
 
   renderer.render(scene, camera);
 
-  stats.update()
+  stats.update();
 };
 
 animate();
